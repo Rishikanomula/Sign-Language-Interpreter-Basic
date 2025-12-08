@@ -1,0 +1,9 @@
+mediapipe>=0.10.0
+opencv-python
+numpy
+torch>=1.13
+torchvision
+flask
+tqdm
+scikit-learn
+pandas
