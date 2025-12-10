@@ -1,49 +1,70 @@
-# models/train.py
-import torch, numpy as np, argparse
-from torch.utils.data import TensorDataset, DataLoader
-from sklearn.model_selection import train_test_split
-from lstm_model import LSTMClassifier
+import os
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 
-def train_loop(X, y, input_size, n_classes, epochs=20, batch=16, lr=1e-3):
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    tr_loader = DataLoader(TensorDataset(torch.tensor(X_train).float(), torch.tensor(y_train).long()), batch_size=batch, shuffle=True)
-    val_loader = DataLoader(TensorDataset(torch.tensor(X_val).float(), torch.tensor(y_val).long()), batch_size=batch)
-    model = LSTMClassifier(input_size, hidden_size=256, num_layers=2, num_classes=n_classes, bidirectional=True)
-    opt = torch.optim.Adam(model.parameters(), lr=lr)
-    loss_fn = torch.nn.CrossEntropyLoss()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    for ep in range(epochs):
-        model.train()
-        tot, acc = 0.0, 0
-        for xb, yb in tr_loader:
-            xb,yb = xb.to(device), yb.to(device)
-            opt.zero_grad()
-            out = model(xb)
-            loss = loss_fn(out, yb)
-            loss.backward()
-            opt.step()
-            tot += loss.item()
-        # validation
-        model.eval()
-        correct=0; total=0
-        with torch.no_grad():
-            for xb,yb in val_loader:
-                xb,yb = xb.to(device), yb.to(device)
-                preds = model(xb).argmax(dim=1)
-                correct += (preds==yb).sum().item()
-                total += yb.size(0)
-        print(f"Epoch {ep+1}/{epochs} loss={tot/len(tr_loader):.4f} val_acc={correct/total:.3f}")
-    torch.save(model.state_dict(), "lstm_sign.pth")
-    print("Saved model lstm_sign.pth")
 
-if __name__=="__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data_prefix", default="data")
-    parser.add_argument("--epochs", type=int, default=20)
-    args = parser.parse_args()
-    X = np.load(f"{args.data_prefix}_X.npy")  # (N, seq, feat)
-    y = np.load(f"{args.data_prefix}_y.npy")
-    input_size = X.shape[2]
-    n_classes = len(set(y))
-    train_loop(X, y, input_size, n_classes, epochs=args.epochs)
+# CONFIG
+DATASET_DIR = r"C:\Users\rishi\Downloads\asl_small"
+IMAGE_SIZE = 64
+BATCH_SIZE = 8
+EPOCHS = 20
+
+# DATA AUGMENTATION
+
+datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=30,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    zoom_range=0.3,
+    horizontal_flip=True
+)
+
+train_data = datagen.flow_from_directory(
+    DATASET_DIR,
+    target_size=(IMAGE_SIZE, IMAGE_SIZE),
+    batch_size=BATCH_SIZE,
+    class_mode="categorical"
+)
+
+NUM_CLASSES = train_data.num_classes
+CLASS_LABELS = list(train_data.class_indices.keys())
+
+# MODEL
+model = Sequential([
+    Conv2D(16, (3,3), activation="relu", input_shape=(64,64,3)),
+    MaxPooling2D(2,2),
+
+    Conv2D(32, (3,3), activation="relu"),
+    MaxPooling2D(2,2),
+
+    Flatten(),
+    Dense(64, activation="relu"),
+    Dropout(0.3),
+    Dense(NUM_CLASSES, activation="softmax")
+])
+
+model.compile(
+    optimizer="adam",
+    loss="categorical_crossentropy",
+    metrics=["accuracy"]
+)
+
+model.summary()
+
+# TRAIN
+model.fit(
+    train_data,
+    steps_per_epoch=40,
+    epochs=EPOCHS
+)
+
+# SAVE MODEL + LABELS
+model.save("asl_model.h5")
+
+with open("labels.txt", "w") as f:
+    for label in CLASS_LABELS:
+        f.write(label + "\n")
+
+print("✅ Model and labels saved successfully")

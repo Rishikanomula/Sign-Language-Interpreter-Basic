@@ -1,7 +1,7 @@
 # data_prep/extract_keypoints.py
 import cv2, os, argparse
 import numpy as np
-import mediapipe as mp
+import keypoints as mp
 from tqdm import tqdm
 
 mp_holistic = mp.solutions.holistic
