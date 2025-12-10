@@ -5,7 +5,7 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropou
 
 
 # CONFIG
-DATASET_DIR = r"C:\Users\rishi\Downloads\asl_small"
+DATASET_DIR = r"C:\Users\rishi\Downloads\asl_alphabet_test\asl_alphabet_test"
 IMAGE_SIZE = 64
 BATCH_SIZE = 8
 EPOCHS = 20
